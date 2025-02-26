@@ -1,0 +1,4 @@
+{
+    "ollama_host": "http://localhost:11434",
+    "default_model": "aratan/tulu3"
+}
