@@ -1,20 +1,12 @@
 # myfwia/agents/supervisor.py
-
 from .agent import Agent
 
 class Supervisor(Agent):
-    """
-    Representa un agente supervisor que evalúa las respuestas de otros agentes.
-    """
-    def __init__(self, verbose=True):
+    """Agente supervisor para verificar y corregir respuestas."""
+    def __init__(self):
         super().__init__(
-            role="Supervisor de IA",
-            goal="Evaluar y supervisar el trabajo de otros agentes.",
-            backstory="Soy el supervisor encargado de asegurar que las respuestas sean precisas y completas.",
-            verbose=verbose,
+            role="Supervisor IA",
+            goal="Verificar y corregir información.",
+            backstory="Experto en detectar errores y mejorar la precisión.",
+            verbose=True,
         )
-
-    def evaluate_response(self, response):
-        if "error" in response.lower():
-            return "Evaluación: La respuesta contiene un error."
-        return "Evaluación: La respuesta parece correcta."

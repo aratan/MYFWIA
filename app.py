@@ -5,7 +5,8 @@ from myfwia import (
     task_registry,
     OllamaClient,
     load_config,
-    Translator
+    Translator,
+    Supervisor  # Asegúrate de tener Supervisor importado
 )
 import logging
 import colorlog
@@ -49,7 +50,7 @@ logger.addHandler(handler)
 config = load_config()
 ollama_client = OllamaClient(host=config["ollama_host"])
 
-# --- Definición de Agentes (igual que antes) ---
+# --- Definición de Agentes (igual que antes + Supervisor) ---
 class Agent1(Agent):
     """Agente especializado en respuestas geográficas."""
     def __init__(self):
@@ -80,38 +81,71 @@ class TimeAgent(Agent):
             verbose=True,
         )
 
-# Instanciar agentes (igual que antes)
+class Supervisor(Agent): # Asegúrate de que tu clase Supervisor esté definida así o similar en myfwia/agents/supervisor.py
+    """Agente supervisor para verificar y corregir respuestas."""
+    def __init__(self):
+        super().__init__(
+            role="Supervisor IA",
+            goal="Verificar y corregir información.",
+            backstory="Experto en detectar errores y mejorar la precisión.",
+            verbose=True,
+        )
+
+# Instanciar agentes (igual que antes + Supervisor)
 agente_geografico = Agent1()
 agente_internet = Agent2()
 agente_tiempo = TimeAgent()
 agente_traductor = Translator()
+agente_supervisor = Supervisor()
 
-
-# --- Lógica de Ejecución (igual que antes) ---
+# --- Lógica de Ejecución (MODIFICADA para supervisión con PROMPT DE PRECISIÓN) ---
 def execute_task(tarea: Task, ollama_client: OllamaClient) -> tuple[str, str]:
-    """Ejecuta una tarea y maneja el registro de resultados."""
+    """Ejecuta una tarea, la supervisa y maneja el registro de resultados."""
     logger.info(f"Asignando tarea a: {tarea.agent.role}")
     parts = tarea.description.split(maxsplit=1)
     task_type = parts[0].lower()
     task_args = parts[1] if len(parts) > 1 else None
 
+    initial_result = None
+
     try:
         if task_type in task_registry:
             if task_args:
-                resultado = task_registry[task_type](task_args)
+                initial_result = task_registry[task_type](task_args)
             else:
-                resultado = task_registry[task_type]()
+                initial_result = task_registry[task_type]()
         else:
             response = ollama_client.generate_response(
                 model=config["default_model"],
                 prompt=tarea.description
             )
-            resultado = response
+            initial_result = response
     except Exception as e:
         logger.error(f"Error ejecutando tarea: {str(e)}")
-        resultado = "Error al procesar la solicitud"
+        return (tarea.agent.role, "Error al procesar la solicitud")
 
-    return (tarea.agent.role, resultado)
+    # --- Supervisión del resultado - PROMPT DE PRECISIÓN FACTUAL ---
+    logger.info(f"Supervisando resultado de {tarea.agent.role} (precisión)...")
+    supervision_prompt = (
+        f"Tarea original: '{tarea.description}'. "
+        f"Resultado del agente {tarea.agent.role}: '{initial_result}'. "
+        f"**Verifica cuidadosamente si la respuesta es FACTUALMENTE correcta y precisa.** "
+        f"Corrige cualquier información incorrecta o engañosa. "
+        f"Si la respuesta es correcta, simplemente confírmala. Devuelve solo el resultado corregido o confirmado."
+    )
+
+    try:
+        supervision_response = ollama_client.generate_response(
+            model=config["default_model"],
+            prompt=supervision_prompt
+        )
+        resultado_supervisado = supervision_response
+        logger.info(f"Resultado supervisado (precisión): {resultado_supervisado}")
+    except Exception as e:
+        logger.error(f"Error durante la supervisión (precisión): {str(e)}")
+        resultado_supervisado = f"Error al supervisar el resultado por precisión. Resultado original: {initial_result}"
+
+    return (tarea.agent.role, resultado_supervisado)
 
 
 def main():
@@ -120,29 +154,29 @@ def main():
     logger.info("🚀 Iniciando ejecución de tareas...")
 
     # --- Solicitar PAÍS al usuario ---
-    pais_usuario = input("Introduce el país para las tareas (ej. Francia, España, Japón): ")
+    dato_usuario = input("Introduce el país para las tareas (ej. Francia, España, Japón): ")
 
-    # --- Definición de Tareas (AHORA se usa pais_usuario) ---
+    # --- Definición de Tareas (AHORA se usa dato_usuario) ---
     tareas = [
         Task(
-            description=f"¿Cuál es la capital de {pais_usuario}?", # Usar pais_usuario
+            description=f"¿Cuál es la capital de {dato_usuario}?", # Usar dato_usuario
             agent=agente_geografico
         ),
         Task(
-            description=f"get_temperature {pais_usuario}", # Usar pais_usuario
+            description=f"get_temperature {dato_usuario}", # Usar dato_usuario
             agent=agente_internet
         ),
         Task(description="get_current_time", agent=agente_tiempo),
         Task(
-            description=f"get_weather_forecast {pais_usuario}", # Usar pais_usuario
+            description=f"get_weather_forecast {dato_usuario}", # Usar dato_usuario
             agent=agente_internet
         ),
         Task(
-            description=f"Traduce el saludo tipico de {pais_usuario} al español", # Usar pais_usuario
+            description=f"Traduce el saludo tipico de {dato_usuario} al español", # Usar dato_usuario
             agent=agente_traductor
         ),
         Task(
-            description=f"¿Cuál es la marca de perfume más cara en {pais_usuario}?", # Usar pais_usuario
+            description=f"¿Cuál es la marca de perfume más cara en {dato_usuario}?", # Usar dato_usuario
             agent=agente_internet
         ),
     ]
