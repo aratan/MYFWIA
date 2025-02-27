@@ -4,6 +4,7 @@ from datetime import datetime
 from .task import register_task
 
 def get_current_time():
-    return datetime.now().strftime("%H:%M")
+    current_time = datetime.now(datetime.timezone.utc).time()
+    return current_time.strftime('%H:%M:%S')
 
 register_task("get_current_time", get_current_time)

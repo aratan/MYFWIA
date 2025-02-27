@@ -100,10 +100,7 @@ tareas = [
         description="get_temperature París",
         agent=agente_internet
     ),
-    Task(
-        description="get_current_time",
-        agent=agente_tiempo
-    ),
+    Task(description="get_current_time", agent=agente_tiempo),
     Task(
         description="get_weather_forecast París",
         agent=agente_internet

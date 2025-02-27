@@ -1,4 +1,4 @@
 {
     "ollama_host": "http://localhost:11434",
-    "default_model": "aratan/tulu3"
+    "default_model": "qwen2.5:1.5b"
 }
